@@ -33,12 +33,14 @@ class Provider:
     messages: system/user/assistant/tool theo format Chat Completions. message trả về
     cần được append nguyên vẹn; tool result có role, tool_call_id, content (JSON string).
     """
-    def __init__(self, name, model):
+    def __init__(self, name, model, reasoning_effort=None):
         if name not in CONFIG:
             raise ValueError(f'Provider không hợp lệ: {name}')
         if not model:
             raise ValueError('Cần đặt MODEL là model có hỗ trợ tool calling.')
         self.name, self.model = name, model
+        # Tuỳ chọn: 'none' tắt chế độ thinking (Ollama hỗ trợ qua endpoint OpenAI).
+        self.reasoning_effort = reasoning_effort
         key_name, self.url = CONFIG[name]
         self.key = os.getenv(key_name) or ('ollama' if name == 'ollama' else None)
         if not self.key:
@@ -53,6 +55,8 @@ class Provider:
         payload = {'model': self.model, 'messages': messages}
         if schemas:
             payload['tools'] = schemas
+        if self.reasoning_effort:
+            payload['reasoning_effort'] = self.reasoning_effort
         data = post_json(self.url, {'Authorization': f'Bearer {self.key}'}, payload, timeout=self._timeout())
         choice = data['choices'][0]
         message = choice['message']
