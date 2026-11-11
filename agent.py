@@ -67,6 +67,7 @@ def run_agent(question, provider, tools, max_steps=6):
     ]
     trace = []
     usage = []
+    observed_urls = []
     for step in range(max_steps):
         try:
             response = _complete_with_retry(provider, message, SCHEMAS, trace, step + 1)
@@ -94,9 +95,23 @@ def run_agent(question, provider, tools, max_steps=6):
         })
         if not response.get('calls'):
             if response.get('finish') == 'stop':
+                answer = response['message'].get('content') or ''
+                if observed_urls and not any(url in answer for url in observed_urls):
+                    trace.append({
+                        'event': 'validation_missing_source',
+                        'step': step + 1,
+                        'expected_any_of': observed_urls,
+                    })
+                    message.append({
+                        "role": "user",
+                        'content': 'Câu trả lời thiếu URL nguồn của incident đã kiểm tra. '
+                                   'Hãy viết lại câu trả lời và dẫn ít nhất một URL sau: '
+                                   + ', '.join(observed_urls),
+                    })
+                    continue
                 return {
                     'status': 'completed',
-                    'answer': response['message'].get('content') or '',
+                    'answer': answer,
                     'trace': trace,
                     'usage': usage
                 }
@@ -133,5 +148,8 @@ def run_agent(question, provider, tools, max_steps=6):
                 'args': args,
                 'result': result,
             })
+            if call['name'] == 'get_incident_details' and result.get('ok') and result.get('url'):
+                if result['url'] not in observed_urls:
+                    observed_urls.append(result['url'])
     trace.append({'event': 'max_steps', 'steps': max_steps})
     return {'status': 'max_steps', 'answer': '', 'trace': trace, 'usage': usage, 'error': f'hit max_steps={max_steps}'}
