@@ -72,12 +72,12 @@ class BonusRunnerTests(unittest.TestCase):
             outfile=str(Path(td)/'result.json')
             with patch.object(run_evals,'run_case',side_effect=fake), patch.object(sys,'argv',['run_evals.py','--bonus','--model','test','--output',outfile]), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(run_evals.main(),0)
-            report=json.loads(Path(outfile).read_text())
+            report=json.loads(Path(outfile).read_text(encoding='utf-8'))
             self.assertEqual(report['summary']['bonus_points_0_15'],12)
             self.assertEqual(report['config']['dataset'],'bonus')
             with patch.object(run_evals,'run_case',side_effect=fake), patch.object(sys,'argv',['run_evals.py','--bonus','--case','B1','--model','test','--output',outfile]), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(run_evals.main(),0)
-            report=json.loads(Path(outfile).read_text())
+            report=json.loads(Path(outfile).read_text(encoding='utf-8'))
             self.assertIsNone(report['summary']['bonus_points_0_15'])
     def test_main_dataset_remains_independent(self):
         import json, tempfile
@@ -87,7 +87,7 @@ class BonusRunnerTests(unittest.TestCase):
             outfile=str(Path(td)/'result.json')
             with patch.object(run_evals,'run_case',return_value={'id':'E1','grade':{'score':90,'status':'scored'}}), patch.object(sys,'argv',['run_evals.py','--case','E1','--model','test','--output',outfile]), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(run_evals.main(),0)
-            report=json.loads(Path(outfile).read_text())
+            report=json.loads(Path(outfile).read_text(encoding='utf-8'))
             self.assertEqual(report['config']['dataset'],'core')
             self.assertNotIn('bonus_points_0_15',report['summary'])
 
