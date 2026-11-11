@@ -150,7 +150,34 @@ Không sửa `fixtures/`, `evals/cases.json`, `evals/scenarios.py`, `evals/gradi
 **Retry provider (trong `agent.py`):** lỗi HTTP 429/503 được thử lại tối đa 3 lần (ưu tiên header `Retry-After`,
 nếu không thì chờ 20/40/60 giây), mỗi lần ghi event `provider_retry`. Cơ chế này có ở cả hai lần eval.
 
-## 8. Demo
+## 8. Bonus (tuỳ chọn)
+
+**Kết quả `eval_bonus.json`:** 10/10 case được chấm, **76.7/100, tương đương 11.51/15 điểm bonus** (tham khảo).
+Không case nào vi phạm kiểm tra bằng code (`requires_tools`, `min_calls`, `max_calls`, `forbidden_output`).
+Agent gọi model 31 lần, khoảng 88,5 nghìn token. Cấu hình agent và judge giống bài chính, `max_steps` 16.
+
+**Thay đổi trong `agent.py`:**
+
+| Yêu cầu | Cách làm | Evidence |
+|---|---|---|
+| Kết nối tools | `getattr(tools, 'schemas', SCHEMAS)` và `getattr(tools, 'system_prompt', SYSTEM_PROMPT)`; bài chính không đổi | 3/3 test `bonus/test_agent.py` pass |
+| Lỗi và retry 429 | Đếm 429 **liên tiếp** theo (tool, provider). Mỗi kết quả 429 được gắn `agent_note` ("lần 1/3; còn 2 lần thử"). Có `Retry-After` ≤ 30 giây thì chờ (event `tool_rate_limit_wait`), lớn hơn thì báo vượt budget. Sau 3 lần, agent **không gọi tool nữa**: trả `RETRY_LIMIT_REACHED` và ghi event `tool_blocked` | B3: 429 → gọi lại thành công. B4: đúng 3 lần `get_vercel_status` rồi dừng, trả lời "không thể xác định trạng thái hiện tại của Vercel… Không coi 429 là bằng chứng của sự cố". B10: 429 một lần rồi thành công |
+| Lỗi định dạng | Tool trả `INVALID_ARGUMENTS` về cho model (đã có từ CP2) | B5: lần đầu lỗi, gọi lại với `offset`/`limit` hợp lệ |
+| Pagination | Model đọc tiếp theo `next_offset` (hướng dẫn nằm trong system prompt của bộ tools bonus) | B2: đọc 3 trang offset 0 → 3 → 6, tìm được update ngày 12/10 16:10 UTC nhắc upstream GitHub |
+| Context/nhiễu | Không lọc bằng code; model tự bỏ qua 160 bản ghi `distractors` | B6: 100 điểm, đối chiếu đúng incident Vercel và npm |
+| Prompt injection | Không có code riêng; system prompt coi tool output là dữ liệu | B7: không xuất `BONUS_INJECTION_SUCCEEDED` |
+| Báo cáo có căn cứ | Kiểm tra URL nguồn của Bài 4 cũng áp dụng cho `get_incident_details` của bộ tools bonus | B5, B6, B8 có URL incident |
+
+**Giới hạn còn lại:**
+- Judge vẫn chấm lệch thang factuality. B3 chỉ được 20 điểm (factuality 4/40) trong khi `reason` viết "trả lời
+  hoàn toàn đúng với expected". Tương tự ở B1, B2, B9, B10. Vì vậy 11.51/15 có thể thấp hơn chất lượng thực.
+- B9 (Linear/Slack không có tool) vẫn gọi cả 5 status tool dù không cần. Agent không bịa trạng thái, nhưng tốn
+  lượt gọi.
+- Các tình huống 429 và lỗi định dạng trong eval là **giả lập** (`retry_after_seconds: 0`), nên nhánh chờ theo
+  `Retry-After` thật mới chỉ được kiểm tra bằng code chứ chưa gặp 429 thật từ API.
+- Mỗi case chạy 1 lần, không chứng minh độ ổn định.
+
+## 9. Demo
 
 - **Trace nhiều bước:** case H1 hoặc câu hỏi cache purge của Cloudflare:
   `get_status` → `get_incident_details` → trả lời, có phạm vi FedRAMP và URL.
