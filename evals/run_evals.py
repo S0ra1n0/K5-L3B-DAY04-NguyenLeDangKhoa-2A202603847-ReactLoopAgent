@@ -22,7 +22,8 @@ def run_case(case, args):
     if not isinstance(result, dict) or not isinstance(result.get('trace', []), list):
         result = {'status': 'error', 'answer': '', 'trace': [], 'usage': [], 'error': 'run_agent trả kết quả không hợp lệ.'}
     try:
-        judge = Provider(args.judge_provider, args.judge_model, reasoning_effort=getattr(args, 'judge_reasoning_effort', None))
+        judge = Provider(args.judge_provider, args.judge_model, reasoning_effort=getattr(args, 'judge_reasoning_effort', None),
+                         temperature=getattr(args, 'judge_temperature', None))
         grade = grade_case(case, result, judge)
     except Exception as exc:
         grade = {'score': None, 'status': 'unscored', 'reason': str(exc), 'judge_usage': {}}
@@ -40,6 +41,8 @@ def main():
     parser.add_argument('--judge-model', default=os.getenv('JUDGE_MODEL'))
     parser.add_argument('--judge-reasoning-effort', default=os.getenv('JUDGE_REASONING_EFFORT'),
                         help="Ví dụ 'none' để tắt thinking của judge (Ollama); giữ nguyên giữa các lần eval")
+    parser.add_argument('--judge-temperature', type=float, default=None,
+                        help='Ví dụ 0 để judge chấm ổn định; bỏ trống = mặc định của model')
     parser.add_argument('--bonus', action='store_true', help='Chạy bộ bonus riêng; không ảnh hưởng điểm chính')
     parser.add_argument('--case', help='Ví dụ E2 hoặc H1; bỏ trống để chạy toàn bộ')
     parser.add_argument('--max-steps', type=int, default=None, help='Giới hạn model calls mỗi case: mặc định 8, bonus 16')
@@ -67,7 +70,8 @@ def main():
         results = list(pool.map(run_and_print, selected))
     report = {'summary': summarize(results), 'config': {'provider': args.provider, 'model': args.model,
               'judge_provider': args.judge_provider, 'judge_model': args.judge_model,
-              'judge_reasoning_effort': args.judge_reasoning_effort, 'max_steps': args.max_steps,
+              'judge_reasoning_effort': args.judge_reasoning_effort, 'judge_temperature': args.judge_temperature,
+              'max_steps': args.max_steps,
               'dataset': 'bonus' if args.bonus else 'core'}, 'cases': results}
     summary = report['summary']
     if args.bonus:

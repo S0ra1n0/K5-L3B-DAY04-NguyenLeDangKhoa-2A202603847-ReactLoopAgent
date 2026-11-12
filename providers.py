@@ -33,7 +33,7 @@ class Provider:
     messages: system/user/assistant/tool theo format Chat Completions. message trả về
     cần được append nguyên vẹn; tool result có role, tool_call_id, content (JSON string).
     """
-    def __init__(self, name, model, reasoning_effort=None):
+    def __init__(self, name, model, reasoning_effort=None, temperature=None):
         if name not in CONFIG:
             raise ValueError(f'Provider không hợp lệ: {name}')
         if not model:
@@ -41,6 +41,8 @@ class Provider:
         self.name, self.model = name, model
         # Tuỳ chọn: 'none' tắt chế độ thinking (Ollama hỗ trợ qua endpoint OpenAI).
         self.reasoning_effort = reasoning_effort
+        # Tuỳ chọn: temperature (ví dụ 0 để judge chấm ổn định); None = mặc định của model.
+        self.temperature = temperature
         key_name, self.url = CONFIG[name]
         self.key = os.getenv(key_name) or ('ollama' if name == 'ollama' else None)
         if not self.key:
@@ -57,6 +59,8 @@ class Provider:
             payload['tools'] = schemas
         if self.reasoning_effort:
             payload['reasoning_effort'] = self.reasoning_effort
+        if self.temperature is not None:
+            payload['temperature'] = self.temperature
         data = post_json(self.url, {'Authorization': f'Bearer {self.key}'}, payload, timeout=self._timeout())
         choice = data['choices'][0]
         message = choice['message']
@@ -88,6 +92,8 @@ class Provider:
         payload = {'model': self.model, 'max_tokens': 1024, 'system': system, 'messages': native}
         if tools:
             payload['tools'] = tools
+        if self.temperature is not None:
+            payload['temperature'] = self.temperature
         data = post_json(self.url, {'x-api-key': self.key, 'anthropic-version': '2023-06-01'}, payload, timeout=self._timeout())
         blocks = data['content']
         calls = [{'id': b['id'], 'name': b['name'], 'arguments': json.dumps(b['input'], ensure_ascii=False)} for b in blocks if b['type'] == 'tool_use']
